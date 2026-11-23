@@ -2,7 +2,9 @@
 """Builds _site/: web app files + data split into 24 MB parts (served by GitHub Pages) + data/manifest.json"""
 import os, json, shutil, time
 SITE = '_site'; os.makedirs(SITE + '/data', exist_ok=True)
-for f in ['index.html', 'sw.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png']: shutil.copy(f, SITE)
+for f in ['index.html', 'sw.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png']:
+    if os.path.exists(f): shutil.copy(f, SITE)
+    else: print('WARNING: missing', f)
 man = {'v': int(time.time()), 'files': {}}
 for name in ('places.tsv', 'ksa.graph'):
     p = os.path.join('dl', name)
