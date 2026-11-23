@@ -1,0 +1,21 @@
+name: Build offline data
+on: workflow_dispatch
+permissions: { contents: write, actions: write }
+jobs:
+  data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y osmium-tool
+      - run: pip install osmium numpy
+      - name: Download GCC extract and clip to Saudi Arabia
+        run: |
+          curl -L -o gcc.pbf https://download.geofabrik.de/asia/gcc-states-latest.osm.pbf
+          osmium extract -b 34.4,15.6,55.8,32.3 gcc.pbf -o ksa.pbf
+      - run: python tools/build_data.py ksa.pbf
+      - name: Publish release "webdata" and redeploy the site
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release delete webdata --cleanup-tag -y || true
+          gh release create webdata ksa.graph places.tsv --title "web offline data" --notes "Saudi road graph + place names"
+          gh workflow run pages.yml
