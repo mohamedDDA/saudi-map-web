@@ -14,7 +14,14 @@ jobs:
           sudo fallocate -l 8G /swapfile && sudo chmod 600 /swapfile
           sudo mkswap /swapfile && sudo swapon /swapfile
           free -h
+      - name: Restore cached Saudi Arabia PBF
+        id: cache-ksa
+        uses: actions/cache/restore@v4
+        with:
+          path: ksa.pbf
+          key: ksa-pbf-v1
       - name: Download GCC extract and clip to Saudi Arabia
+        if: steps.cache-ksa.outputs.cache-hit != 'true'
         timeout-minutes: 30
         run: |
           curl -fL --retry 8 --retry-delay 20 --retry-all-errors --connect-timeout 60 -o gcc.pbf https://download.geofabrik.de/asia/gcc-states-latest.osm.pbf
@@ -22,6 +29,12 @@ jobs:
           osmium extract -b 34.4,15.6,55.8,32.3 gcc.pbf -o ksa.pbf
           rm gcc.pbf          # free ~1 GB of disk before the build
           ls -l ksa.pbf; df -h /
+      - name: Save Saudi Arabia PBF to cache
+        if: steps.cache-ksa.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ksa.pbf
+          key: ksa-pbf-v1
       - name: Build the whole-KSA pack and one pack per city (tools/regions.json)
         timeout-minutes: 75
         env: { PYTHONUNBUFFERED: "1" }   # show progress lines live in the log
