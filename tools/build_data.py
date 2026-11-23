@@ -3,7 +3,7 @@
    <name>.graph - compact road graph for the in-app router
    <name>.tsv   - place/street/POI names for offline Arabic search (one line per place)
 Usage: python build_data.py extract.pbf [name]      (name defaults to "ksa")"""
-import sys, re, math, array
+import sys, os, re, math, array
 import numpy as np, osmium
 
 SPEED = {'motorway': 100, 'trunk': 90, 'primary': 70, 'secondary': 60, 'tertiary': 50, 'unclassified': 40,
@@ -27,8 +27,9 @@ class Count(osmium.SimpleHandler):            # pass 1: which nodes are junction
         if usable(w.tags): s.a.extend([n.ref for n in w.nodes])
 
 class Build(osmium.SimpleHandler):            # pass 2: edges + names
-    def __init__(s, inter):
-        super().__init__(); s.inter = inter; s.idx = {}; s.lat = []; s.lon = []; s.E = []; s.rows = []; s.seen = set()
+    def __init__(s, inter, tsv):
+        super().__init__(); s.inter = inter; s.idx = {}; s.lat = array.array('i'); s.lon = array.array('i')
+        s.E = array.array('q'); s.nrows = 0; s.seen = set(); s.tsv = tsv; s.cnt = 0   # flat arrays: ~10x less RAM than lists of tuples
     def ni(s, p):
         i = s.idx.get(p[0])
         if i is None:
@@ -36,11 +37,14 @@ class Build(osmium.SimpleHandler):            # pass 2: edges + names
         return i
     def add(s, nm, kind, lat, lon, dedupe=False):
         if dedupe:
-            k = (nm, round(lat, 2), round(lon, 2))
+            k = hash((nm, round(lat, 2), round(lon, 2)))   # store only the hash, not the tuple
             if k in s.seen: return
             s.seen.add(k)
-        s.rows.append((nm, norm(nm), kind, lat, lon))
+        s.tsv.write('%s\t%s\t%s\t%.5f\t%.5f\n' % (norm(nm).replace('\t', ' ').replace('\n', ' '), nm.replace('\t', ' ').replace('\n', ' '), kind, lat, lon))
+        s.nrows += 1   # streamed straight to disk instead of kept in memory
     def node(s, n):
+        s.cnt += 1
+        if s.cnt % 5000000 == 0: print('  ..', s.cnt // 1000000, 'M nodes read', flush=True)
         t = n.tags; nm = t.get('name:ar') or t.get('name')
         if not nm: return
         if t.get('place') in PLACE: k = 'place'
@@ -63,23 +67,24 @@ class Build(osmium.SimpleHandler):            # pass 2: edges + names
             acc += hav(p[k - 1], p[k])
             if k == len(p) - 1 or p[k][0] in s.inter or acc >= 250:   # keep junctions + a node every ~250 m
                 b = s.ni(p[k]); L = int(acc) + 1
-                s.E.append((a, b, L, sp | ff)); s.E.append((b, a, L, sp | rf)); a = b; acc = 0.0
+                s.E.extend((a, b, L, sp | ff, b, a, L, sp | rf)); a = b; acc = 0.0
 
 src = sys.argv[1]; name = sys.argv[2] if len(sys.argv) > 2 else 'ksa'
+print(name, ': pass 1 (counting junctions)', flush=True)
 c = Count(); c.apply_file(src)
 ids, cnt = np.unique(np.frombuffer(c.a, dtype=np.int64), return_counts=True)
 inter = set(ids[cnt >= 2].tolist()); del c, ids, cnt
-b = Build(inter); b.apply_file(src, locations=True)
-n = len(b.lat)
-if not b.E:
-    print(name, ': no usable roads in this area - nothing written'); sys.exit(0)
-E = np.array(b.E, dtype=np.int64); E = E[np.argsort(E[:, 0], kind='stable')]
+print(name, ': pass 2 (edges + names)', flush=True)
+tmp = name + '.tsv.part'
+with open(tmp, 'w', encoding='utf-8') as tsv:   # for the web app (one line per place)
+    b = Build(inter, tsv); b.apply_file(src, locations=True)
+n = len(b.lat); del inter, b.idx, b.seen
+if not len(b.E):
+    os.remove(tmp); print(name, ': no usable roads in this area - nothing written'); sys.exit(0)
+E = np.frombuffer(b.E, dtype=np.int64).reshape(-1, 4); E = E[np.argsort(E[:, 0], kind='stable')]
 off = np.searchsorted(E[:, 0], np.arange(n + 1))
 with open(name + '.graph', 'wb') as f:
     np.array([0x4B534147, n, len(E)], '>i4').tofile(f)
-    for arr in (np.array(b.lat), np.array(b.lon), off, E[:, 1], E[:, 2], E[:, 3]): arr.astype('>i4').tofile(f)
-print(name, ': nodes', n, 'edges', len(E), 'places', len(b.rows))
-
-with open(name + '.tsv', 'w', encoding='utf-8') as f:   # for the web app (one line per place)
-    for nm, nrm, kind, la, lo in b.rows:
-        f.write('%s\t%s\t%s\t%.5f\t%.5f\n' % (nrm.replace('\t', ' ').replace('\n', ' '), nm.replace('\t', ' ').replace('\n', ' '), kind, la, lo))
+    for arr in (np.frombuffer(b.lat, dtype=np.int32), np.frombuffer(b.lon, dtype=np.int32), off, E[:, 1], E[:, 2], E[:, 3]): arr.astype('>i4').tofile(f)
+os.replace(tmp, name + '.tsv')
+print(name, ': nodes', n, 'edges', len(E), 'places', b.nrows, flush=True)

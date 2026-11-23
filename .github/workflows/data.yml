@@ -4,20 +4,31 @@ permissions: { contents: write, actions: write }
 jobs:
   data:
     runs-on: ubuntu-latest
+    timeout-minutes: 120          # a hung run can never sit for hours again
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y osmium-tool
       - run: pip install osmium numpy
+      - name: Add 8 GB swap (the whole-KSA graph is memory hungry)
+        run: |
+          sudo fallocate -l 8G /swapfile && sudo chmod 600 /swapfile
+          sudo mkswap /swapfile && sudo swapon /swapfile
+          free -h
       - name: Download GCC extract and clip to Saudi Arabia
+        timeout-minutes: 30
         run: |
           curl -fL --retry 8 --retry-delay 20 --retry-all-errors --connect-timeout 60 -o gcc.pbf https://download.geofabrik.de/asia/gcc-states-latest.osm.pbf
           ls -l gcc.pbf
           osmium extract -b 34.4,15.6,55.8,32.3 gcc.pbf -o ksa.pbf
+          rm gcc.pbf          # free ~1 GB of disk before the build
+          ls -l ksa.pbf; df -h /
       - name: Build the whole-KSA pack and one pack per city (tools/regions.json)
+        timeout-minutes: 75
+        env: { PYTHONUNBUFFERED: "1" }   # show progress lines live in the log
         run: python tools/build_regions.py ksa.pbf out
       - name: Publish release "webdata" and redeploy the site
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
-          gh release delete webdata --cleanup-tag -y || true
-          gh release create webdata out/*.graph out/*.tsv --title "web offline data" --notes "Saudi road graph + place names (whole KSA + per-city packs)"
+          gh release view webdata >/dev/null 2>&1 || gh release create webdata --title "web offline data" --notes "Saudi road graph + place names (whole KSA + per-city packs)"
+          gh release upload webdata out/*.graph out/*.tsv --clobber    # replaces files in place, never leaves the release empty
           gh workflow run pages.yml

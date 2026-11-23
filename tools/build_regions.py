@@ -21,10 +21,17 @@ if cities:   # all city boxes cut in one pass over the file
     cfgp = os.path.join(out, '_extract.json'); json.dump(cfg, open(cfgp, 'w'))
     subprocess.check_call(['osmium', 'extract', '--overwrite', '-c', cfgp, src])
 
-for r in regions:
+# cities first (small, fast), the whole-KSA pack last: if it runs out of memory the city packs already exist
+order = cities + [r for r in regions if r['id'] == 'ksa']
+failed = []
+for r in order:
     pbf = src if r['id'] == 'ksa' else os.path.join(tmp, r['id'] + '.pbf')
-    if not os.path.exists(pbf): print('skip', r['id'], '(no extract)'); continue
-    build(pbf, r['id'])
-    if r['id'] != 'ksa': os.remove(pbf)   # keep the runner's disk free
+    if not os.path.exists(pbf): print('skip', r['id'], '(no extract)', flush=True); continue
+    try: build(pbf, r['id'])
+    except subprocess.CalledProcessError as e:
+        failed.append(r['id']); print('FAILED', r['id'], '(exit %s) - continuing' % e.returncode, flush=True)
+    if r['id'] != 'ksa' and os.path.exists(pbf): os.remove(pbf)   # keep the runner's disk free
 
-print('done:', ', '.join(sorted(f for f in os.listdir(out) if f.endswith(('.graph', '.tsv')))))
+built = sorted(f for f in os.listdir(out) if f.endswith(('.graph', '.tsv')))
+print('done:', ', '.join(built)); print('failed:', ', '.join(failed) or 'none')
+sys.exit(0 if any(f.endswith('.graph') for f in built) else 1)
