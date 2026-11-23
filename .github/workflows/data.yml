@@ -10,7 +10,8 @@ jobs:
       - run: pip install osmium numpy
       - name: Download GCC extract and clip to Saudi Arabia
         run: |
-          curl -L -o gcc.pbf https://download.geofabrik.de/asia/gcc-states-latest.osm.pbf
+          curl -fL --retry 8 --retry-delay 20 --retry-all-errors --connect-timeout 60 -o gcc.pbf https://download.geofabrik.de/asia/gcc-states-latest.osm.pbf
+          ls -l gcc.pbf
           osmium extract -b 34.4,15.6,55.8,32.3 gcc.pbf -o ksa.pbf
       - name: Build the whole-KSA pack and one pack per city (tools/regions.json)
         run: python tools/build_regions.py ksa.pbf out

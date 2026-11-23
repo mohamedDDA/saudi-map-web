@@ -637,7 +637,7 @@ html,body{-webkit-tap-highlight-color:transparent}
     var b = map.getBounds(), z0 = Math.max(9, Math.round(map.getZoom())), out = [], z, x, y, x0, x1, y0, y1, n;
     function tx(lng, z) { return Math.floor((lng + 180) / 360 * Math.pow(2, z)); }
     function ty(lat, z) { var r = lat * RAD; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z)); }
-    for (z = z0; z <= Math.min(z0 + 3, 17); z++) {
+    for (z = Math.max(6, z0 - 3); z <= Math.min(z0 + 3, 17); z++) {   // a few levels out and in, so zooming works offline both ways
       x0 = tx(b.getWest(), z); x1 = tx(b.getEast(), z); y0 = ty(b.getNorth(), z); y1 = ty(b.getSouth(), z);
       n = (x1 - x0 + 1) * (y1 - y0 + 1);
       if (out.length + n > MAX_TILES) break;
@@ -684,10 +684,10 @@ html,body{-webkit-tap-highlight-color:transparent}
     h += '</div><h3>المفضلة</h3>';
     if (!sv.length) h += '<div class="hint">اضغط «★ حفظ» في بطاقة أي مكان ليظهر هنا ويعمل دون إنترنت.</div>';
     for (i = 0; i < sv.length; i++) h += '<div class="sv"><span data-sv="' + i + '">' + esc(sv[i].n) + '</span><button type="button" data-sd="' + i + '" aria-label="حذف">&times;</button></div>';
-    h += '<h3>خرائط دون إنترنت</h3><div class="hint">تُحفظ تلقائياً المناطق التي تتصفحها. يمكنك أيضاً تنزيل المنطقة الظاهرة حالياً (حتى ' + nums(MAX_TILES) + ' لوحة، بمستويات تكبير متتالية). المحفوظ الآن: <b id="dlcnt">٠</b> لوحة.</div>';
-    h += '<button class="act pri" data-act="dl">تنزيل المنطقة الظاهرة</button><button class="act" data-act="clr">حذف الخرائط المحفوظة</button><div class="hint" id="dlst"></div><div class="hint" id="stor"></div>';
-    h += '<h3>بحث واتجاهات دون إنترنت</h3><div class="hint">اختر المدن التي تحتاجها (حجمها أصغر بكثير) أو نزّل المملكة كاملة. التنزيل لمرة واحدة ويُفضّل واي فاي. الاتجاهات تعمل داخل المدن المنزّلة؛ للتنقل بين المدن نزّل المملكة كاملة.</div>';
+    h += '<h3>بحث واتجاهات دون إنترنت</h3><div class="hint">كل حزمة (مدينة أو المملكة كاملة) تشمل البحث في الأماكن والشوارع <b>وحساب الطرق (الاتجاهات)</b> معاً. اختر المدن التي تحتاجها (حجمها أصغر بكثير) أو نزّل المملكة كاملة. التنزيل لمرة واحدة ويُفضّل واي فاي. الاتجاهات تعمل داخل المدن المنزّلة؛ للتنقل بين المدن نزّل المملكة كاملة.</div>';
     h += '<div id="rgList"><div class="hint">جارٍ التحميل…</div></div><button class="act pri" id="rdl" data-act="rdl" disabled>اختر مدينة أو المملكة كاملة</button><button class="act" data-act="xdata">حذف كل البيانات</button><div class="hint" id="dstat"></div><div class="hint" id="dsum"></div>';
+    h += '<h3>صور الخريطة دون إنترنت</h3><div class="hint">الحزم أعلاه للبحث والاتجاهات فقط، ولا تتضمن صور الخريطة. تُحفظ تلقائياً صور ما تتصفحه، لكن مستويات التكبير التي لم تفتحها لن تظهر دون إنترنت. لحفظها مسبقاً، قرّب الخريطة إلى المنطقة المطلوبة ثم اضغط الزر (حتى ' + nums(MAX_TILES) + ' لوحة، بعدة مستويات تكبير). المحفوظ الآن: <b id="dlcnt">٠</b> لوحة.</div>';
+    h += '<button class="act pri" data-act="dl">حفظ المنطقة الظاهرة للاستخدام دون إنترنت</button><button class="act" data-act="clr">حذف الخرائط المحفوظة</button><div class="hint" id="dlst"></div><div class="hint" id="stor"></div>';
     h += '<h3>الإعدادات</h3><button class="act" data-act="digits">الأرقام: ' + (arDig ? 'عربية ٠١٢٣ (اضغط للغربية)' : 'غربية 0123 (اضغط للعربية)') + '</button>';
     if (deferredInstall) h += '<button class="act pri" data-act="inst">تثبيت التطبيق على الشاشة الرئيسية</button>';
     else h += '<div class="hint">للتثبيت: من قائمة المتصفح اختر «إضافة إلى الشاشة الرئيسية» (في آيفون: زر المشاركة ثم «إضافة إلى الشاشة الرئيسية»).</div>';
