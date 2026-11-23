@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Fetch offline data (if built)
         env: { GH_TOKEN: "${{ github.token }}" }
-        run: gh release download webdata --repo ${{ github.repository }} --dir dl --pattern 'ksa.graph' --pattern 'places.tsv' || echo "no data release yet"
+        run: gh release download webdata --repo ${{ github.repository }} --dir dl --pattern '*.graph' --pattern '*.tsv' || echo "no data release yet"
       - run: python3 tools/make_site.py
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4

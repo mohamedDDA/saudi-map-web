@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Builds offline data from a Saudi OSM extract:
-   ksa.graph  - compact road graph for the in-app router
-   places.db  - SQLite place/street/POI names for offline Arabic search
-Usage: python build_data.py ksa.pbf"""
-import sys, re, math, sqlite3, array
+"""Builds offline data from an OSM extract:
+   <name>.graph - compact road graph for the in-app router
+   <name>.tsv   - place/street/POI names for offline Arabic search (one line per place)
+Usage: python build_data.py extract.pbf [name]      (name defaults to "ksa")"""
+import sys, re, math, array
 import numpy as np, osmium
 
 SPEED = {'motorway': 100, 'trunk': 90, 'primary': 70, 'secondary': 60, 'tertiary': 50, 'unclassified': 40,
@@ -65,21 +65,21 @@ class Build(osmium.SimpleHandler):            # pass 2: edges + names
                 b = s.ni(p[k]); L = int(acc) + 1
                 s.E.append((a, b, L, sp | ff)); s.E.append((b, a, L, sp | rf)); a = b; acc = 0.0
 
-src = sys.argv[1]
+src = sys.argv[1]; name = sys.argv[2] if len(sys.argv) > 2 else 'ksa'
 c = Count(); c.apply_file(src)
 ids, cnt = np.unique(np.frombuffer(c.a, dtype=np.int64), return_counts=True)
 inter = set(ids[cnt >= 2].tolist()); del c, ids, cnt
 b = Build(inter); b.apply_file(src, locations=True)
-n = len(b.lat); E = np.array(b.E, dtype=np.int64); E = E[np.argsort(E[:, 0], kind='stable')]
+n = len(b.lat)
+if not b.E:
+    print(name, ': no usable roads in this area - nothing written'); sys.exit(0)
+E = np.array(b.E, dtype=np.int64); E = E[np.argsort(E[:, 0], kind='stable')]
 off = np.searchsorted(E[:, 0], np.arange(n + 1))
-with open('ksa.graph', 'wb') as f:
+with open(name + '.graph', 'wb') as f:
     np.array([0x4B534147, n, len(E)], '>i4').tofile(f)
     for arr in (np.array(b.lat), np.array(b.lon), off, E[:, 1], E[:, 2], E[:, 3]): arr.astype('>i4').tofile(f)
-db = sqlite3.connect('places.db')
-db.execute('CREATE TABLE places(name TEXT, norm TEXT, kind TEXT, lat REAL, lon REAL)')
-db.executemany('INSERT INTO places VALUES (?,?,?,?,?)', b.rows); db.commit(); db.execute('VACUUM'); db.close()
-print('nodes', n, 'edges', len(E), 'places', len(b.rows))
+print(name, ': nodes', n, 'edges', len(E), 'places', len(b.rows))
 
-with open('places.tsv', 'w', encoding='utf-8') as f:   # for the web app (one line per place)
+with open(name + '.tsv', 'w', encoding='utf-8') as f:   # for the web app (one line per place)
     for nm, nrm, kind, la, lo in b.rows:
         f.write('%s\t%s\t%s\t%.5f\t%.5f\n' % (nrm.replace('\t', ' ').replace('\n', ' '), nm.replace('\t', ' ').replace('\n', ' '), kind, la, lo))

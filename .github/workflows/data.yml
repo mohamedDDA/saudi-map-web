@@ -12,10 +12,11 @@ jobs:
         run: |
           curl -L -o gcc.pbf https://download.geofabrik.de/asia/gcc-states-latest.osm.pbf
           osmium extract -b 34.4,15.6,55.8,32.3 gcc.pbf -o ksa.pbf
-      - run: python tools/build_data.py ksa.pbf
+      - name: Build the whole-KSA pack and one pack per city (tools/regions.json)
+        run: python tools/build_regions.py ksa.pbf out
       - name: Publish release "webdata" and redeploy the site
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           gh release delete webdata --cleanup-tag -y || true
-          gh release create webdata ksa.graph places.tsv --title "web offline data" --notes "Saudi road graph + place names"
+          gh release create webdata out/*.graph out/*.tsv --title "web offline data" --notes "Saudi road graph + place names (whole KSA + per-city packs)"
           gh workflow run pages.yml

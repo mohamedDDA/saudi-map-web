@@ -110,6 +110,15 @@ html,body{-webkit-tap-highlight-color:transparent}
 .sv button{color:var(--danger);font-size:20px;padding:0 8px}
 .act{display:block;width:100%;margin-top:8px;padding:11px;border:1px solid var(--green);border-radius:10px;color:var(--green);font-weight:700;background:#fff}
 .act.pri{background:var(--green);color:#fff}
+.act:disabled{opacity:.5}
+.rg{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.rg label{flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0}
+.rg input{width:20px;height:20px;flex:none}
+.rg .ok{width:20px;flex:none;text-align:center;color:var(--green);font-weight:800}
+.rg .rn{font-weight:700}
+.rg small{color:var(--gray);font-size:12.5px;white-space:nowrap}
+.rg button{color:var(--danger);font-size:22px;padding:0 8px}
+.rg.full{background:var(--sand);margin:0 -6px;padding:8px 6px;border-radius:8px}
 .pill{position:absolute;z-index:790;top:calc(var(--top) + 64px);left:50%;transform:translateX(-50%);background:var(--danger);color:#fff;border-radius:999px;padding:4px 14px;font-size:13px;display:none}
 .pill.on{display:block}
 
@@ -677,7 +686,8 @@ html,body{-webkit-tap-highlight-color:transparent}
     for (i = 0; i < sv.length; i++) h += '<div class="sv"><span data-sv="' + i + '">' + esc(sv[i].n) + '</span><button type="button" data-sd="' + i + '" aria-label="حذف">&times;</button></div>';
     h += '<h3>خرائط دون إنترنت</h3><div class="hint">تُحفظ تلقائياً المناطق التي تتصفحها. يمكنك أيضاً تنزيل المنطقة الظاهرة حالياً (حتى ' + nums(MAX_TILES) + ' لوحة، بمستويات تكبير متتالية). المحفوظ الآن: <b id="dlcnt">٠</b> لوحة.</div>';
     h += '<button class="act pri" data-act="dl">تنزيل المنطقة الظاهرة</button><button class="act" data-act="clr">حذف الخرائط المحفوظة</button><div class="hint" id="dlst"></div><div class="hint" id="stor"></div>';
-    h += '<h3>بحث واتجاهات دون إنترنت</h3><div class="hint">تنزيل لمرة واحدة (حجم كبير، يُفضّل واي فاي)، ثم يعمل البحث في الأماكن والشوارع وحساب الطرق دون إنترنت. على الآيفون قد تحتاج هاتفاً حديثاً.</div><button class="act pri" data-act="ddata">تنزيل / تحديث البيانات</button><button class="act" data-act="xdata">حذف البيانات</button><div class="hint" id="dstat"></div>';
+    h += '<h3>بحث واتجاهات دون إنترنت</h3><div class="hint">اختر المدن التي تحتاجها (حجمها أصغر بكثير) أو نزّل المملكة كاملة. التنزيل لمرة واحدة ويُفضّل واي فاي. الاتجاهات تعمل داخل المدن المنزّلة؛ للتنقل بين المدن نزّل المملكة كاملة.</div>';
+    h += '<div id="rgList"><div class="hint">جارٍ التحميل…</div></div><button class="act pri" id="rdl" data-act="rdl" disabled>اختر مدينة أو المملكة كاملة</button><button class="act" data-act="xdata">حذف كل البيانات</button><div class="hint" id="dstat"></div><div class="hint" id="dsum"></div>';
     h += '<h3>الإعدادات</h3><button class="act" data-act="digits">الأرقام: ' + (arDig ? 'عربية ٠١٢٣ (اضغط للغربية)' : 'غربية 0123 (اضغط للعربية)') + '</button>';
     if (deferredInstall) h += '<button class="act pri" data-act="inst">تثبيت التطبيق على الشاشة الرئيسية</button>';
     else h += '<div class="hint">للتثبيت: من قائمة المتصفح اختر «إضافة إلى الشاشة الرئيسية» (في آيفون: زر المشاركة ثم «إضافة إلى الشاشة الرئيسية»).</div>';
@@ -691,10 +701,12 @@ html,body{-webkit-tap-highlight-color:transparent}
     if ((v = t.getAttribute('data-city')) !== null) { var c = CITIES[+v]; map.setView([c[1], c[2]], c[3]); return; }
     if ((v = t.getAttribute('data-sv')) !== null) { var a = getSaved()[+v]; map.setView([a.la, a.lo], 16); placeMarker(L.latLng(a.la, a.lo)); return; }
     if ((v = t.getAttribute('data-sd')) !== null) { var l = getSaved(); l.splice(+v, 1); setLS('ksa_saved', JSON.stringify(l)); renderSvc(); return; }
+    if ((v = t.getAttribute('data-rg')) !== null) { SEL[v] = !!t.checked; if (v === 'ksa' && LAST) renderRegions(LAST.inst, LAST.man); else updateSel(); return; }
+    if ((v = t.getAttribute('data-rx')) !== null) { deleteRegion(v); return; }
     v = t.getAttribute('data-act'); if (!v) return;
     if (v === 'dl') downloadArea();
     else if (v === 'clr') { if (window.caches) caches.delete(TILE_CACHE).then(function () { countTiles(); $('dlst').textContent = 'تم حذف الخرائط المحفوظة.'; }); }
-    else if (v === 'ddata') downloadData();
+    else if (v === 'rdl') downloadRegions();
     else if (v === 'xdata') deleteData();
     else if (v === 'digits') { arDig = !arDig; setLS('ksa_digits', arDig ? '1' : '0'); renderSvc(); }
     else if (v === 'inst' && deferredInstall) { deferredInstall.prompt(); deferredInstall = null; renderSvc(); }
@@ -780,16 +792,47 @@ html,body{-webkit-tap-highlight-color:transparent}
     }
     return next();
   }
-  function loadData(which) {   // which = 'graph' | 'places'
-    var key = 'p_' + which;
-    if (DATA[key]) return DATA[key];
+  /* Packs: each downloaded region (whole KSA or one city) = graph file + places file, listed in cache entry installed.json */
+  var KSA_ALL = [34.4, 15.6, 55.8, 32.3], MEM = {}, REMOTE = null, LAST = null, SEL = {}, DL_BUSY = false;
+  function putInstalled(c, inst) { return c.put(dataURL('installed.json'), new Response(JSON.stringify({ installed: inst }), { headers: { 'Content-Type': 'application/json' } })); }
+  function getInstalled() {   // -> { id: region entry } for everything downloaded on this device
+    if (!window.caches) return Promise.resolve({});
+    return caches.open(DATA_CACHE).then(function (c) {
+      return c.match(dataURL('installed.json')).then(function (r) {
+        if (r) return r.json().then(function (j) { return j.installed || {}; });
+        return c.match(dataURL('manifest.json')).then(function (o) {   // data saved by the older single-download version = whole KSA
+          if (!o) return {};
+          return o.json().then(function (m) {
+            var g = m.files && m.files['ksa.graph'], pl = m.files && m.files['places.tsv'], x = {};
+            if (g && pl) x.ksa = { id: 'ksa', name: 'المملكة كاملة', v: m.v || 0, bbox: KSA_ALL, size: g.size + pl.size, files: { graph: g, places: pl } };
+            return x;
+          });
+        });
+      });
+    }).catch(function () { return {}; });
+  }
+  function loadAll(which) {   // which = 'graph' | 'places'  ->  [{id, bbox, x}] for every downloaded pack
     if (!window.caches || !window.Promise || !window.TextEncoder) return Promise.reject(new Error('unsupported'));
-    DATA[key] = caches.open(DATA_CACHE).then(function (c) {
-      return c.match(dataURL('manifest.json')).then(function (r) { if (!r) throw new Error('nodata'); return r.json(); })
-        .then(function (man) { return readFile(c, man.files[which === 'graph' ? 'ksa.graph' : 'places.tsv']); });
-    }).then(function (u8) { if (which === 'graph') initGraph(u8); else DATA.places = u8; })
-      .catch(function (e) { DATA[key] = null; throw e; });
-    return DATA[key];
+    return getInstalled().then(function (inst) {
+      var ids = Object.keys(inst);
+      if (!ids.length) throw new Error('nodata');
+      return Promise.all(ids.map(function (id) {
+        var r = inst[id], m = MEM[id] || (MEM[id] = {});
+        if (!m[which]) m[which] = caches.open(DATA_CACHE).then(function (c) { return readFile(c, r.files[which]); })
+          .then(function (u8) { if (which === 'graph') { initGraph(u8); return DATA.graph; } return u8; })
+          .catch(function (e) { m[which] = null; throw e; });
+        return m[which].then(function (x) { return { id: id, bbox: r.bbox || KSA_ALL, x: x }; }, function () { return null; });
+      }));
+    }).then(function (list) {
+      list = list.filter(Boolean);
+      if (!list.length) throw new Error('nodata');
+      return list;
+    });
+  }
+  function inBox(b, ll) { return ll.lng >= b[0] && ll.lng <= b[2] && ll.lat >= b[1] && ll.lat <= b[3]; }
+  function graphsFor(list, a, b) {   // downloaded packs covering both points, smallest area first
+    return list.filter(function (it) { return inBox(it.bbox, a) && inBox(it.bbox, b); })
+      .sort(function (p, q) { return (p.bbox[2] - p.bbox[0]) * (p.bbox[3] - p.bbox[1]) - (q.bbox[2] - q.bbox[0]) * (q.bbox[3] - q.bbox[1]); });
   }
   var KIND_AR = { place: 'منطقة', poi: 'معلم', road: 'شارع' }, KIND_RANK = { place: 0, poi: 1, road: 2 };
   function offlineFind(q, cb) {   // cities + saved places + the downloaded place database
@@ -797,8 +840,12 @@ html,body{-webkit-tap-highlight-color:transparent}
     var res = CITIES.map(function (c) { return { n: c[0], la: c[1], lo: c[2], z: c[3], k: 'مدينة' }; })
       .concat(getSaved().map(function (x) { return { n: x.n, la: x.la, lo: x.lo, z: 16, k: 'مفضلة' }; }))
       .filter(function (x) { return norm(x.n).indexOf(nq) > -1; });
-    loadData('places').then(function () {
-      var rows = psearch(nq, 2000);
+    loadAll('places').then(function (list) {
+      var rows = [], seen = {};
+      list.forEach(function (it) {
+        DATA.places = it.x;
+        psearch(nq, 2000).forEach(function (r) { var k = r.n + '|' + r.la.toFixed(3) + '|' + r.lo.toFixed(3); if (!seen[k]) { seen[k] = 1; rows.push(r); } });
+      });
       rows.sort(function (a, b) { return (KIND_RANK[a.kind] - KIND_RANK[b.kind]) || (a.n.length - b.n.length); });
       rows.slice(0, 10).forEach(function (r) { res.push({ n: r.n, la: r.la, lo: r.lo, z: r.kind === 'place' ? 13 : 17, k: KIND_AR[r.kind] || '' }); });
       cb(res);
@@ -814,14 +861,21 @@ html,body{-webkit-tap-highlight-color:transparent}
   }
   function offlineRoute(id) {
     $('routes').innerHTML = '<div class="row">جارٍ حساب المسار دون إنترنت…</div>'; $('steps').innerHTML = '';
-    loadData('graph').then(function () {
+    loadAll('graph').then(function (list) {
       setTimeout(function () {   // let the page paint before the heavy calculation
         if (id !== rReq) return;
-        var all = [], dist = 0, time = 0, k, r;
+        var all = [], dist = 0, time = 0, k, q, r, cand, uncovered = false;
         for (k = 1; k < pts.length; k++) {
-          r = groute(pts[k - 1].ll, pts[k].ll, mode === 'car');
-          if (!r) { offlineLine(); $('routes').innerHTML += '<div class="row">لم يُعثر على مسار طرق في البيانات المحفوظة.</div>'; return; }
+          cand = graphsFor(list, pts[k - 1].ll, pts[k].ll); r = null;
+          if (!cand.length) { uncovered = true; break; }
+          for (q = 0; q < cand.length && !r; q++) { DATA.graph = cand[q].x; r = groute(pts[k - 1].ll, pts[k].ll, mode === 'car'); }
+          if (!r) break;
           all = all.concat(all.length ? r.coords.slice(1) : r.coords); dist += r.dist; time += r.time;
+        }
+        if (!r) {
+          offlineLine();
+          $('routes').innerHTML += '<div class="row">' + (uncovered ? 'نقطتا البداية والنهاية ليستا ضمن بيانات منزّلة واحدة. نزّل المملكة كاملة (أو المدينة التي تشملهما) من «الأدوات».' : 'لم يُعثر على مسار طرق في البيانات المحفوظة.') + '</div>';
+          return;
         }
         routes = [{ distance: dist, duration: time, geometry: { type: 'LineString', coordinates: all }, legs: [{ steps: [] }] }];
         selRoute = 0; drawRoutes(true);
@@ -830,47 +884,105 @@ html,body{-webkit-tap-highlight-color:transparent}
     }, function () { offlineLine(); });
   }
   function setStat(t) { var e = $('dstat'); if (e) e.textContent = t; }
+  function mbs(b) { return nums(Math.max(1, Math.round(b / 1048576))); }
+  function selIds() { return SEL.ksa ? ['ksa'] : Object.keys(SEL).filter(function (k) { return SEL[k]; }); }
+  function updateSel() {   // label + enabled state of the download button
+    var b = $('rdl'); if (!b) return;
+    var ids = selIds(), t = 0, m = {};
+    ((REMOTE && REMOTE.regions) || []).forEach(function (r) { m[r.id] = r; });
+    ids.forEach(function (id) { if (m[id]) t += m[id].size; });
+    b.disabled = DL_BUSY || !ids.length;
+    b.textContent = DL_BUSY ? 'جارٍ التنزيل…' : ids.length ? 'تنزيل المحدد (' + mbs(t) + ' ميغابايت)' : 'اختر مدينة أو المملكة كاملة';
+  }
+  function renderRegions(inst, man) {   // the list of packs: downloaded ones + the ones the site offers
+    var box = $('rgList'); if (!box) return;
+    LAST = { inst: inst, man: man };
+    var regs = ((man && man.regions) || []).slice(), known = {}, full = !!inst.ksa, h = '', tot = 0;
+    regs.forEach(function (r) { known[r.id] = 1; });
+    Object.keys(inst).forEach(function (id) { if (!known[id]) regs.push(inst[id]); });   // downloaded earlier, no longer published
+    Object.keys(inst).forEach(function (id) { tot += inst[id].size || 0; });
+    if (!regs.length) h = '<div class="hint">' + (navigator.onLine === false ? 'تحتاج اتصالاً بالإنترنت لعرض البيانات المتاحة للتنزيل.' : 'البيانات غير منشورة بعد على الموقع.') + '</div>';
+    regs.sort(function (a, b) { return (b.id === 'ksa') - (a.id === 'ksa'); });
+    regs.forEach(function (r) {
+      var have = inst[r.id], stale = have && r.v && have.v < r.v, covered = full && r.id !== 'ksa' && !have, off = SEL.ksa && r.id !== 'ksa';
+      var lead, status = mbs(r.size) + ' ميغابايت';
+      if (have && !stale) { lead = '<span class="ok">✓</span>'; status = 'منزّلة · ' + status; }
+      else {
+        lead = '<input type="checkbox" data-rg="' + r.id + '"' + (SEL[r.id] && !off ? ' checked' : '') + (off || covered ? ' disabled' : '') + '>';
+        if (stale) status = 'تحديث متاح · ' + status; else if (covered) status = 'ضمن المملكة كاملة';
+      }
+      h += '<div class="rg' + (r.id === 'ksa' ? ' full' : '') + '"><label>' + lead + '<span class="rn">' + esc(r.name) + '</span></label><small>' + status + '</small>' +
+        (have ? '<button type="button" data-rx="' + r.id + '" aria-label="حذف">&times;</button>' : '') + '</div>';
+    });
+    box.innerHTML = h; updateSel();
+    var sm = $('dsum'); if (sm) sm.textContent = Object.keys(inst).length ? 'المحفوظ على هذا الجهاز: ' + mbs(tot) + ' ميغابايت.' : 'لم تُنزَّل بيانات بعد.';
+  }
+  function remoteManifest() {   // what the site offers (last copy is kept for when you are offline)
+    var old = function () { try { return JSON.parse(getLS('ksa_rman')); } catch (e) { return null; } };
+    if (navigator.onLine === false) return Promise.resolve(old());
+    return fetch(dataURL('manifest.json') + '?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('nomanifest'); return r.text(); })
+      .then(function (t) { setLS('ksa_rman', t); return JSON.parse(t); }).catch(function () { return old(); });
+  }
   function dataStatus() {
     if (!window.caches) { setStat('غير مدعوم في هذا المتصفح.'); return; }
-    caches.open(DATA_CACHE).then(function (c) { return c.match(dataURL('manifest.json')); }).then(function (r) {
-      if (!r) { setStat('غير منزّلة بعد.'); return; }
-      return r.json().then(function (m) { var t = 0, k; for (k in m.files) t += m.files[k].size; setStat('جاهزة: ' + nums(Math.round(t / 1048576)) + ' ميغابايت.'); });
-    }).catch(function () { setStat('غير منزّلة بعد.'); });
+    Promise.all([getInstalled(), remoteManifest()]).then(function (a) { REMOTE = a[1]; renderRegions(a[0], a[1]); });
   }
-  function downloadData() {
+  function downloadRegions() {
     if (!window.caches || !window.fetch || !window.Promise) { toast('متصفحك لا يدعم التخزين دون إنترنت.'); return; }
     if (navigator.onLine === false) { toast('تحتاج اتصالاً بالإنترنت للتنزيل.'); return; }
+    var want = {}; selIds().forEach(function (id) { want[id] = 1; });
+    var regs = ((REMOTE && REMOTE.regions) || []).filter(function (r) { return want[r.id]; });
+    if (!regs.length || DL_BUSY) return;
+    DL_BUSY = true; updateSel();
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+    var total = 0, n = 0; regs.forEach(function (r) { total += r.files.graph.parts.length + r.files.places.parts.length; });
     setStat('جارٍ البدء…');
-    fetch(dataURL('manifest.json') + '?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('nomanifest'); return r.text(); }).then(function (txt) {
-      var man = JSON.parse(txt), jobs = [], k;
-      for (k in man.files) man.files[k].parts.forEach(function (p) { jobs.push(p); });
-      return caches.delete(DATA_CACHE).then(function () { return caches.open(DATA_CACHE); }).then(function (c) {
-        DATA.graph = null; DATA.places = null; DATA.p_graph = null; DATA.p_places = null;
-        var i = 0;
-        function next() {
-          if (i >= jobs.length) return c.put(dataURL('manifest.json'), new Response(txt, { headers: { 'Content-Type': 'application/json' } }));
-          var p = jobs[i++]; setStat('تنزيل ' + nums(i) + ' / ' + nums(jobs.length) + '…');
-          return fetch(dataURL(p), { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('part'); return c.put(dataURL(p), r); }).then(next);
+    getInstalled().then(function (inst) {
+      return caches.open(DATA_CACHE).then(function (c) {
+        var ri = 0;
+        function nextRegion() {
+          if (ri >= regs.length) return;
+          var r = regs[ri++], parts = r.files.graph.parts.concat(r.files.places.parts), i = 0;
+          delete inst[r.id]; MEM = {};   // not usable until every part of it has arrived
+          return putInstalled(c, inst).then(function step() {
+            if (i >= parts.length) { inst[r.id] = r; return putInstalled(c, inst); }
+            var pn = parts[i++]; n++; setStat('تنزيل «' + r.name + '»: ' + nums(n) + ' / ' + nums(total) + '…');
+            return fetch(dataURL(pn), { cache: 'no-store' }).then(function (res) { if (!res.ok) throw new Error('part'); return c.put(dataURL(pn), res); }).then(step);
+          }).catch(function (e) { parts.forEach(function (pn) { c.delete(dataURL(pn)); }); throw e; }).then(nextRegion);
         }
-        return next();
+        return nextRegion();
       });
-    }).then(function () { dataStatus(); toast('اكتمل تنزيل البيانات. تعمل الآن دون إنترنت.'); })
-      .catch(function (e) { setStat(e && e.message === 'nomanifest' ? 'البيانات غير منشورة بعد على الموقع.' : 'تعذّر التنزيل. تحقق من الاتصال وحاول مجدداً.'); });
+    }).then(function () {
+      DL_BUSY = false; SEL = {}; MEM = {}; setStat(''); dataStatus(); toast('اكتمل التنزيل. تعمل هذه البيانات الآن دون إنترنت.');
+    }, function () {
+      DL_BUSY = false; MEM = {}; setStat('تعذّر إكمال التنزيل. ما اكتمل منه محفوظ؛ تحقق من الاتصال وحاول مجدداً.'); dataStatus();
+    });
+  }
+  function deleteRegion(id) {
+    getInstalled().then(function (inst) {
+      var r = inst[id]; if (!r || !window.confirm('حذف بيانات «' + r.name + '» من هذا الجهاز؟')) return;
+      return caches.open(DATA_CACHE).then(function (c) {
+        var ps = r.files.graph.parts.concat(r.files.places.parts);
+        delete inst[id]; MEM = {};
+        return putInstalled(c, inst).then(function () { return Promise.all(ps.map(function (pn) { return c.delete(dataURL(pn)); })); });
+      });
+    }).then(dataStatus, dataStatus);
   }
   function deleteData() {
-    if (!window.caches) return;
-    caches.delete(DATA_CACHE).then(function () { DATA.graph = null; DATA.places = null; DATA.p_graph = null; DATA.p_places = null; dataStatus(); });
+    if (!window.caches || !window.confirm('حذف كل بيانات البحث والاتجاهات من هذا الجهاز؟')) return;
+    caches.delete(DATA_CACHE).then(function () { DATA.graph = null; DATA.places = null; MEM = {}; SEL = {}; dataStatus(); });
   }
-  // ask once, after the first visit, whether to download the data (only if it has been published)
+  // ask once, after the first visit, whether to choose offline data (only if it has been published)
   window.addEventListener('load', function () {
     setTimeout(function () {
       if (!window.caches || !window.fetch || navigator.onLine === false || getLS('ksa_asked')) return;
       fetch(dataURL('manifest.json'), { method: 'HEAD', cache: 'no-store' }).then(function (r) {
         if (!r.ok) return;
-        return caches.open(DATA_CACHE).then(function (c) { return c.match(dataURL('manifest.json')); }).then(function (have) {
-          if (have) return; setLS('ksa_asked', '1');
-          if (window.confirm('هل تريد تنزيل بيانات البحث والاتجاهات الآن لتعمل دون إنترنت؟ (حجم كبير، يُفضّل واي فاي)')) { openSvc(); downloadData(); }
+        return getInstalled().then(function (have) {
+          if (Object.keys(have).length) return; setLS('ksa_asked', '1');
+          if (window.confirm('هل تريد اختيار بيانات البحث والاتجاهات لتعمل دون إنترنت؟ يمكنك تنزيل مدن محددة أو المملكة كاملة.')) {
+            openSvc(); setTimeout(function () { var e = $('rgList'); if (e && e.scrollIntoView) e.scrollIntoView(); }, 600);
+          }
         });
       }).catch(function () {});
     }, 5000);
